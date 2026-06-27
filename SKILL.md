@@ -63,6 +63,26 @@ When you genuinely need the whole picture (e.g. an architecture review of a new 
 system), the worked flows in `references/end-to-end-examples.md` are the fastest way to
 see how the layers interlock; read it after the layer-specific files.
 
+## The strongest default: representing money
+
+State this up front whenever you design or review how amounts are stored or moved — it's
+the most common *silent* failure, so don't wait to be asked. The default stance:
+
+- **Ledger posting** always carries `amount + asset/currency + scale + a rounding-policy
+  reference`. An amount without its scale and currency is ambiguous; a rounded amount with
+  no pointer to why can't be audited.
+- **API / cross-system boundary**: send the amount as a **string** with an **explicitly
+  declared scale and currency**. Never a bare JSON number (it's a double), and never an
+  integer that relies on *implied* decimals (that's how a 100× or 10¹²× error ships).
+- **Computation** runs in decimal/rational at full precision; **round exactly once**, at
+  the boundary, via the explicit policy.
+- **Rounding residuals** are booked or attributed — never silently dropped (invented/lost
+  money otherwise).
+
+Crucially, this is **per-context**: minor-units integer is the right *storage/ledger* form
+but a poor *interchange* form unless the scale travels with it. The full decision matrix
+(ledger / storage / transport / compute / display) is in `references/representing-money.md`.
+
 ## How to apply it well
 
 - **Lead with the principle at risk.** Reviewing or designing, name which of the three is
@@ -71,9 +91,10 @@ see how the layers interlock; read it after the layer-specific files.
 - **Don't over-engineer.** Several patterns (event sourcing, provider redundancy, strict
   immutability, idempotency time-windows) carry real cost. The references note when the
   cheaper option is correct. Match the rigor to the stakes.
-- **Representation and computation are separate decisions.** A system commonly stores
-  amounts one way (integer minor units) and computes another (`BigDecimal`); say so
-  rather than forcing one choice everywhere.
+- **Representation is per-context, not one global choice.** Storage, computation, and the
+  wire each get their own default (see the decision matrix). The frequent mistake is
+  forcing one representation everywhere — e.g. shipping a raw minor-unit integer over an
+  API and trusting the receiver to know the scale.
 - **The outside world doesn't ask permission.** Many "impossible" states (overdrafts,
   out-of-order webhooks, duplicate deliveries) are forced on you by third parties. Design
   to *detect and recover*, not to assume they can't happen.
