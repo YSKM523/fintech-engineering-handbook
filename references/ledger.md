@@ -14,7 +14,10 @@ created or destroyed.
 
 - **Money always has a source and a destination.** External providers get dedicated
   accounts too, so money entering/leaving the system is still tracked.
-- **Balance is never stored.** It's derived from the movements.
+- **Balance is derived, not authoritative.** The entries are the source of truth; any
+  balance is a projection *computed* from them. You may store that projection (cache,
+  snapshot) for performance — what you must never do is treat a stored balance as the truth
+  and mutate it directly (see *Stored balances are projections* below).
 - **Accounts have a type** — asset / liability / equity — so the **accounting equation**
   (`assets = liabilities + equity`) holds and each account has a defined side on which it
   increases. In practice you also need income (revenue) and expense accounts, e.g. to book
@@ -27,6 +30,37 @@ created or destroyed.
 
 **Principles touched** — *No invented data:* money only ever moves between accounts; the
 total is conserved.
+
+### Stored balances are projections, not the source of truth
+
+"Balance is derived from movements" is a statement about *authority*, not a ban on balance
+tables. In any real ledger system balances get stored constantly — the question is *how*,
+not *whether*. Writing "never store a balance" into a design is over-simplified to the point
+of being bad advice.
+
+- **A balance is a projection over entries.** It can be cached, snapshotted, or
+  materialized for performance; the entries remain the single source of truth it derives
+  from (this is the event-sourcing relationship — see Event sourcing).
+- **There isn't one balance — there are several.** Production systems carry multiple
+  distinct projections over the same entries: **posted/total**, **available**
+  (`total − reserved`), **reserved/hold**, **pending vs cleared**, **settled**, and
+  **as-of-date / reporting** balances. Each answers a different question, and conflating
+  them is its own class of bug (see Funds reservation for total vs available).
+- **Any stored balance must be recomputable, reconcilable, explainable, and
+  drift-detectable.** You must be able to (1) recompute it from the entries, (2) reconcile
+  the stored value against that recomputation on a schedule, (3) explain it by pointing to
+  the entries that produced it, and (4) detect and alert on drift when the two disagree —
+  the post-factum check applied to balances (see Invariants and Reconciliation).
+- **What's actually forbidden** is a balance that is its *own* source of truth: an
+  `UPDATE accounts SET balance = balance + :x` with no entry behind it. That mutation can
+  invent or lose money, can't be audited, and drifts silently. Every change to a balance
+  must be the *consequence* of a posting, never a write in its own right.
+
+In short: don't ban the cache, ban the *uncomputable* balance.
+
+**Principles touched** — *No invented data:* a directly-mutated balance can mint or lose
+money with no entry to account for it. *No trust:* a stored balance is verified against the
+entries (reconciliation, drift detection), never assumed correct.
 
 ## Value time vs booking time vs settlement time
 
@@ -93,9 +127,10 @@ questions; only the full history can.
 
 The most principled, systemic way to build an audit trail. Instead of storing current
 state with a log next to it, store **only the events** and derive state from them. The
-double-entry ledger is this pattern applied to money — balance is never stored, it's
-computed from the entries. The trail is then a *primary artifact* and cannot drift from
-reality.
+double-entry ledger is this pattern applied to money — the balance isn't the stored
+*truth*, it's computed from the entries (and may still be cached or snapshotted, see
+*Stored balances are projections*). The trail is then a *primary artifact* and cannot drift
+from reality.
 
 Practical notes:
 
