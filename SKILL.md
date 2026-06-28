@@ -88,9 +88,13 @@ but a poor *interchange* form unless the scale travels with it. The full decisio
 - **Lead with the principle at risk.** Reviewing or designing, name which of the three is
   threatened ("this clamps a negative balance to zero → that *invents* money"). It makes
   feedback concrete and traceable.
-- **Don't over-engineer.** Several patterns (event sourcing, provider redundancy, strict
-  immutability, idempotency time-windows) carry real cost. The references note when the
-  cheaper option is correct. Match the rigor to the stakes.
+- **Match rigor to stakes — in both directions.** Heavy patterns (event sourcing,
+  hot-failover provider redundancy, strict by-construction immutability) are
+  over-engineering on a low-stakes path, but above a stakes threshold they're *mandatory*,
+  not optional — the references say where that line falls. Equally, the cheap-but-risky
+  shortcuts (an idempotency dedup window, trusting a webhook's body, a single provider on a
+  critical path) are fine *until* the stakes cross the same line. Decide by the blast radius
+  of being wrong, not by habit or by what's easiest to build.
 - **Representation is per-context, not one global choice.** Storage, computation, and the
   wire each get their own default (see the decision matrix). The frequent mistake is
   forcing one representation everywhere — e.g. shipping a raw minor-unit integer over an

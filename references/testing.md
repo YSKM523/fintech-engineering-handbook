@@ -2,8 +2,21 @@
 
 Tests matter everywhere, but in a money system they matter more. The difficulty: you
 usually can't enumerate the expected outputs — the space of operation sequences is too
-large, and the interesting failures live in the combinations. Treat the techniques below as
-a **menu**; pick the ones with the most impact on your system.
+large, and the interesting failures live in the combinations.
+
+These techniques are **not all equally optional.** Treat some as defaults you need a reason
+to *skip*, and the rest as a situational menu:
+
+- **Defaults (skip only with a written reason).** Property-based testing on money math and
+  invariants (1); generative idempotency testing for anything that touches the outside world
+  (3); round-trip testing for money/currency serialization (5); backward-compatibility
+  testing for long-lived events and records (7). These guard the three principles directly,
+  and the failures they catch are silent.
+- **Situational menu (pick by impact vs cost).** Invariant-checks-between-steps (2), full
+  crash-and-resume injection (4), golden testing (6), and testing in production (8) — reach
+  for these where the system's risk profile justifies the (often substantial) cost.
+
+The catalogue:
 
 1. **Property-based testing.** Instead of asserting specific outputs, assert that a
    property holds for any generated input. A natural fit for invariants and money math —

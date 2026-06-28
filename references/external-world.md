@@ -10,29 +10,43 @@ You don't control someone else's API — its code, quality, or uptime — so the
 is to assume it will misbehave and build defensively.
 
 1. **Don't trust the schema.** Responses won't always match the contract: fields go
-   missing, types change, nulls appear where they shouldn't. **Validate the important
-   pieces at the boundary and fail loudly** on anything unexpected, so malformed data can't
-   leak in. But **never validate pieces you don't need** — that causes needless outages
-   when a third party breaks its contract (and it will).
+   missing, types change, nulls appear where they shouldn't. **Validate everything you act
+   on or trust** — the amount, the currency, a status you branch on, anything
+   security-relevant — and fail loudly on anything unexpected, so malformed data can't leak
+   in. Conversely, **don't validate fields you merely pass through or ignore**: validating
+   cosmetic data you never use just hands a third party the power to cause you a needless
+   outage when it breaks its own contract (and it will). The test is "do I act on this?",
+   not "is it in the schema?".
 2. **Expect imperfect engineering.** Given time, every questionable practice appears:
    tokens in URLs, lost precision, HTTP codes that lie (a `200` carrying an error body),
    inconsistent pagination, custom date formats. Treat it as the job, not the exception.
-3. **All calls will fail.** Design to handle a missing response. Retries and timeouts are
-   necessary protection.
-4. **Circuit breakers are usually optional.** Mostly a courtesy to an overloaded server,
-   paid for with client-side complexity. It's reasonable to expect the server to shed its
-   own load. That said, a breaker also protects *your* latency and finite resources
-   (threads, connections) — use one when really needed.
+3. **All calls will fail.** Design to handle a missing response — retries and timeouts are
+   necessary protection. But a retry is only safe on an **idempotent** operation, and only
+   with bounded backoff + jitter and a give-up threshold; retrying a non-idempotent call, or
+   retrying tightly with no ceiling, amplifies an outage and can double-move money (see
+   Idempotency).
+4. **Timeouts and bounded concurrency are mandatory; the circuit breaker is the
+   escalation.** The non-negotiable defaults on every external call are a timeout and a
+   concurrency cap (a bulkhead) — without them a single slow dependency drains your threads
+   and connections. A breaker on top is *required*, not optional, when the call sits on a
+   synchronous user/critical path, or shares a finite resource pool a slow dependency can
+   exhaust. It's genuinely optional only for isolated async/background callers with their
+   own resources — there, shedding load is reasonably the server's job. Don't skip the
+   timeout + bulkhead either way.
 5. **Mind the quotas.** Rate limits and usage quotas are easy to forget and cause nasty
    weekend outages. Do napkin math up front (expected volume vs the provider's limits).
 6. **Store every request and response.** Sounds excessive; it's a lifesaver during an
    investigation when an API returns something it shouldn't. Persist what you sent and what
    came back, in structured, queryable form (e.g. a Redshift table). It doubles as audit
    trail, dispute evidence, and material for reprocessing after a bug.
-7. **Aim for provider redundancy.** For the most critical parts, consider more than one
-   provider for the same purpose — validating data across multiple sources (two blockchain
-   nodes) or a backup bank/custodian/KYC vendor. Extremely expensive (development, fees,
-   complexity) but sometimes necessary for the required reliability.
+7. **Default to one provider; add redundancy only past a clear threshold.** A second
+   provider is extremely expensive (development, fees, complexity), so don't reach for it by
+   reflex. Escalate to redundancy when a single source's failure *or silent wrongness* is
+   both **unrecoverable** and **material** — an irreversible money path with no other safety
+   net, a hard regulatory availability bar, or data you can't otherwise verify. Separate the
+   two kinds: **cheap redundancy** (cross-checking a read across two sources, e.g. two
+   blockchain nodes) is worth reaching for early; **expensive redundancy** (a hot-failover
+   backup bank/custodian/KYC vendor) only clears the bar for the highest-stakes paths.
 8. **Don't trust the sandbox.** A provider sandbox is a good sign and fine for basic
    scenarios, but it diverges significantly from production. Be prepared to **test in
    production** (canary releases, controlled small-impact usage).
@@ -51,11 +65,16 @@ trivial. Many of these points apply to other transports too.
 1. **Don't assume ordering.** Messages can arrive out of order or carry stale data — the
    last webhook isn't necessarily the latest truth. Don't blindly overwrite state; reconcile
    against what you already know (e.g. query the API for current state).
-2. **Don't assume validity.** A webhook may come from a secondary part of the issuer's
-   system and carry stale or improperly transformed data. Good practice: **ignore the
-   content and use the webhook only as a trigger** to query the API for authoritative
-   state. Beware the API can be eventually consistent and lag the webhook — a query right
-   after the trigger may still return the old state, so be ready to retry.
+2. **Don't assume validity — default to "trigger, then confirm."** A webhook may come from
+   a secondary part of the issuer's system and carry stale or improperly transformed data,
+   so the default is to **treat the payload as a trigger and query the API for the
+   authoritative state** rather than acting on the webhook's contents. Beware the API can be
+   eventually consistent and lag the webhook — a query right after the trigger may still
+   return the old state, so be ready to retry. You may trust the payload's content only when
+   *all* of these hold: the signature is verified over the raw bytes (point 7); the field is
+   monotonic or otherwise safe to apply twice; and there is no authoritative read endpoint
+   to confirm against (some providers send data their API never exposes). Either way,
+   persist the raw event and keep processing idempotent.
 3. **Don't assume delivery.** Webhooks get lost sooner or later, regardless of the issuer's
    re-delivery promises. Handle a missing webhook with an independent process that fixes
    the completeness of your data — see Reconciliation.
@@ -109,6 +128,11 @@ complex, hard to standardize. Practical options:
 4. **Event sourcing.** The event log already lives in the database, so publishing is just
    reading from it.
 
+Picking a default: reach for the **outbox** when you control the application code (the
+common case); **CDC** when you can't change the app or want zero publishing code in it;
+**event sourcing** when you already keep an event log; **listen-to-yourself** only in the
+niche where rebuilding state from the published event is genuinely simpler.
+
 Whichever you pick, delivery is **at-least-once** — the relay/connector can publish and
 crash before recording that it did, re-sending on restart. Consumers must therefore be
 **idempotent** and deduplicate on a stable event id.
@@ -125,7 +149,11 @@ another (a missed webhook; a transaction posted to the ledger but not reflected 
 provider's system). Reconciliation is the process that aligns the two. (In practice it may
 be more than two — ledger, processor, bank — but the approach is the same.)
 
-1. **Cadence.** Hourly, daily, monthly, or yearly depending on context and constraints.
+1. **Cadence.** Hourly, daily, monthly, or yearly — but *pick* it, don't default to "daily
+   because everyone does." Set cadence no slower than the window in which an undetected drift
+   becomes unrecoverable or materially harmful (tighter for high-value or irreversible
+   flows), and no faster than the settlement horizon resolves — reconciling T+3 settlements
+   every hour just alarms on transfers that aren't late, they're simply not settled yet.
 2. **Nature of drift.** Data can be **missing** (the easy case) or **different** (same
    transaction, different amounts — much harder). Timing matters: with T+3 settlement,
    records stay unreconciled for 3 days, so build that into the process and don't alert on

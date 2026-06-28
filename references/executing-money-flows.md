@@ -50,14 +50,23 @@ Practical notes:
 
 1. **The final amount may differ.** It's not always known upfront (fees/rates differ from
    the estimate). Reserve the estimate, settle the actual amount, release the remainder.
-2. **A reservation must always resolve.** One never settled nor released locks user funds,
-   so every flow that creates one must guarantee it eventually resolves it. An explicit
-   expiry/timeout is a useful safety net but optional — you can rely on internal
-   discipline. The failure mode is conservative: an orphaned reservation *locks* money, it
-   never loses or creates it.
-3. **It needs strong consistency.** Checking the balance and recording the reservation
-   must be **linearizable**. On a stale read, two transactions can both pass the check and
-   back their spends with the same funds. No eventual consistency here.
+2. **A reservation must always resolve, and a backstop must guarantee it.** One never
+   settled nor released locks user funds. The failure mode is conservative — an orphaned
+   reservation *locks* money, it never loses or creates it — but locked user funds is still
+   an incident, and "rely on internal discipline to always resolve it" fails under exactly
+   the crashes and bugs reservations exist to survive. So default to an explicit backstop:
+   either a resumable owning flow whose driver provably resolves every reservation (see Full
+   resumability), or an expiry / orphan-sweeper that releases stragglers. "Discipline only,"
+   with no backstop, is acceptable only when such a driver already owns every reservation's
+   resolution.
+3. **The reserve decision must be linearizable — for that one balance.** Checking available
+   and recording the reservation against a given balance must be a single linearizable step
+   (per-account serialization, or an atomic compare-and-decrement); on a stale read two
+   transactions both pass the check and back their spends with the same funds. Scope this
+   precisely: it's the check-and-reserve on *one* balance that can't be eventually
+   consistent — not the whole flow. The other legs, and cross-account or cross-currency
+   steps, can be async. This is what lets reservation state shard by account and stay
+   correct.
 
 **Principles touched** — *No invented data:* the same funds can never back two
 transactions; a reservation makes this explicit instead of relying on a racy balance check.
@@ -110,15 +119,25 @@ same message delivered twice triggers processing once.
    idempotent result and replay it (the client can retry with a new key). It depends on
    the error: permanent ones (validation) replay as-is; temporary ones (network) might be
    reprocessed.
-3. **Validating the repeated payload.** Good practice to ensure a repeat carries the same
-   payload — but it gets costly and buys little, at the cost of complexity and flexibility
-   (the caller might legitimately change the request).
+3. **Reject a key reused with a different payload.** A retry should carry the same payload;
+   a *different* payload under the same key (a client bug reusing a key for a new amount or
+   destination) is exactly what misroutes or mints money, so don't wave it through. Default
+   to the cheap guard: store a hash/fingerprint of the original request under the key and
+   reject a conflicting reuse (a 409-style "key already used for a different request"). What
+   is genuinely costly and low-value is *deep field-by-field* re-validation — skip that, not
+   the fingerprint. (Leave room for the caller to legitimately retry with a *new* key when
+   they really did change the request.)
 4. **At scale it's hard.** You may dedupe billions of requests *and* get the behavior right
    under concurrent access (two duplicates in the same millisecond). The idempotency
    barrier must be **atomic**.
-5. **Beware time windows.** Deduping only within, say, 24h simplifies implementation
-   (otherwise data grows forever) but costs correctness. Make this tradeoff only if you
-   absolutely must — it will haunt you.
+5. **Default to unbounded keyed dedup; size any window to the upstream, not a round
+   number.** Deduping only within, say, 24h simplifies implementation (otherwise the dedup
+   store grows forever) but trades away correctness — a late duplicate past the window moves
+   money twice. So default to durable, unexpiring keyed dedup. A window is acceptable only
+   when its retention is `≥ the upstream's maximum redelivery/retry horizon × a safety
+   margin` (drive it from the provider's redelivery SLA or your settlement horizon, never a
+   guessed 24h), *and* you alarm on any arrival landing near the window's edge, so a real
+   late duplicate surfaces instead of silently slipping through.
 6. **Test for retries.** Bake a generic middleware into integration/system tests that
    automatically repeats every call.
 7. **Handle out-of-order retries.** Stay idempotent even after moving to a new state — e.g.
