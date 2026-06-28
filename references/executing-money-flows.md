@@ -105,10 +105,13 @@ money. *No trust:* the external world can force an overdraft no matter what your
 
 ## Idempotency
 
-In a distributed system you can't guarantee exactly-once delivery — any call can be
+In a distributed system you can't guarantee exactly-once *delivery* — any call can be
 interrupted and you won't know whether it arrived. To ensure delivery you must **retry**;
 in doing so you risk delivering more than once, so processing must be **idempotent** — the
-same message delivered twice triggers processing once.
+same message delivered twice triggers processing once. The achievable goal is therefore
+**effectively-once processing** (exactly-once *effect*): at-least-once delivery + idempotent
+processing. Stop chasing exactly-once delivery — it doesn't exist; engineer the effect
+instead.
 
 1. **Prefer explicit keys.** Idempotency keys beat business-derived idempotency
    (deduping on the payload), which is fragile — hard to tell whether two transactions with
@@ -177,3 +180,48 @@ hand-roll a persistent state machine.
 money; persisted progress lets the flow be picked up and finished. *No invented data:*
 resuming re-runs steps, so they must re-apply without double-counting — the flow completes
 exactly once.
+
+## The effectively-once review checklist
+
+The two sections above (idempotency, full resumability) exist to buy one property:
+**effectively-once processing** — exactly-once *effect* despite at-least-once delivery and
+crashes. You can't get exactly-once *delivery*, so don't design as if you could; make the
+processing idempotent and the flow resumable, then *verify* it. Run these eight questions on
+any flow that touches the outside world. They're a fixed review — answer each explicitly —
+and each maps to a test you can actually write (see Testing).
+
+1. **What is the idempotency key's scope?** A specific operation *and* a specific
+   client/user — never global, never derived from the payload. (Idempotency 1.)
+2. **May a repeated payload differ under the same key?** No. Same key + different payload →
+   reject (409), compared via a stored request fingerprint; a genuinely new request uses a
+   new key. (Idempotency 3.)
+3. **Are error results replayed, and which errors reprocess vs replay as-is?** Decide it
+   explicitly, don't leave it implicit. A permanent error (validation) is itself the
+   idempotent result and replays as-is; a transient error (network) may reprocess.
+   (Idempotency 2.)
+4. **Can concurrent duplicates slip through?** Only if the barrier isn't atomic. Two
+   duplicates in the same millisecond must collapse to one — enforce with an atomic
+   insert / unique constraint, not a check-then-act. (Idempotency 4.)
+5. **What happens after the dedup window expires?** Default: no window. If one exists, its
+   retention must be ≥ the upstream redelivery/settlement horizon × a safety margin, with an
+   alarm on near-edge arrivals — otherwise a late duplicate moves money twice. (Idempotency 5.)
+6. **An external side effect happened but the internal transaction failed — how does it
+   recover?** External effects can't be rolled back, so roll forward (retry to completion) or
+   compensate (saga). The recovery must *re-check the outside world*, never blindly re-fire (a
+   broadcast re-queries the chain; a charge queries the provider). The inverse — internal
+   commit succeeded but the outbound publish didn't — is the outbox's job (see Notifying
+   reliably). (Resumability 3-4.)
+7. **Does each workflow state have an independent driver that can advance it?** Yes — a
+   scheduler/worker/poller that picks up stalled flows and pushes them forward, so an
+   orchestrator crash can't strand one. (Resumability 2.)
+8. **Is each step safe to re-run?** Yes — persist progress before starting the next step so a
+   restart knows exactly where it was, and make every step idempotent. (Resumability 1, 3.)
+
+Each question is testable, which is the point: questions 1-5 by **generative idempotency
+testing** (auto-repeat every declared call and assert no second effect), questions 6-8 by
+**crash-and-resume injection** (fail between every pair of steps and assert the flow finishes
+exactly once). A design that can't answer one of these has a hole a test would have found.
+
+**Principles touched** — *No invented data:* effectively-once is the whole point — duplicates
+and resumes must collapse to a single effect, never moving money twice. *No lost data:* a
+flow that dies mid-way must resume, not vanish.

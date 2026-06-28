@@ -52,7 +52,7 @@ the task actually needs.
 | --- | --- |
 | How to model/store/serialize an amount; precision, rounding, currencies, FX rate direction & timing | `references/representing-money.md` |
 | Recording movements so the books balance and survive audit: double-entry, value/booking/settlement time, audit trails, event sourcing, immutability, reversals, GDPR | `references/ledger.md` |
-| Keeping a single operation correct end-to-end: invariants, funds reservation/holds, overdrafts, idempotency, crash-resumable multi-step flows | `references/executing-money-flows.md` |
+| Keeping a single operation correct end-to-end: invariants, funds reservation/holds, overdrafts, idempotency, crash-resumable multi-step flows, the effectively-once review checklist | `references/executing-money-flows.md` |
 | Talking to unreliable third parties: the truth hierarchy (which source is authoritative for what), consuming APIs, webhooks, reliable notification (outbox/CDC), reconciliation, data lineage & replayability | `references/external-world.md` |
 | Who may act and proving the process was followed: segregation of duties / four-eyes, access control, the SDLC change trail | `references/controls-and-access.md` |
 | How to gain confidence: property-based testing, invariant/idempotency injection, crash-resume tests, round-trip, golden, backward-compat, testing in production | `references/testing.md` |
@@ -100,6 +100,25 @@ three roles:
 
 Booking basis and final authority are usually *different* sources; the gap between them is
 what reconciliation closes. Per-domain table in `references/external-world.md`.
+
+## Reviewing any flow that touches the outside world: the effectively-once checklist
+
+Exactly-once *delivery* is impossible; aim for **effectively-once processing** (exactly-once
+*effect*) = at-least-once delivery + idempotent, resumable processing. When you design or
+review such a flow, answer these eight out loud, every time — a design that can't answer one
+has a hole:
+
+1. What is the **idempotency key's scope** (which operation + which client)?
+2. Is a **repeated payload allowed to differ** under the same key? (default: no — reject)
+3. Are **error results replayed**, and which errors reprocess vs replay as-is?
+4. Can **concurrent duplicates slip through**? (is the barrier atomic?)
+5. What happens **after the dedup window expires**? (default: no window)
+6. If an **external side effect happened but the internal transaction failed**, how does it recover?
+7. Does **each workflow state have an independent driver** that can advance it?
+8. Is **each step safe to re-run**?
+
+Defaults, rationale, and the test that proves each (questions 1-5 → idempotency testing,
+6-8 → crash/resume injection) are in `references/executing-money-flows.md`.
 
 ## How to apply it well
 
