@@ -1,12 +1,18 @@
-# Fintech Engineering Handbook — Claude skill
+# Fintech Engineering Handbook — agent skill
 
-A [Claude](https://claude.com/claude-code) **skill** that packages the patterns and domain
-knowledge needed to build software that handles money: ledgers, payments, wallets, FX,
-settlement, reconciliation, custody, and the compliance controls around them.
+A portable **agent skill** that packages the patterns and domain knowledge needed to build
+software that handles money: ledgers, payments, wallets, FX, settlement, reconciliation,
+custody, and the compliance controls around them.
+
+It's plain Markdown with no platform-specific code, so it works with any AI coding agent —
+[Claude Code](https://claude.com/claude-code), Codex, GitHub Copilot CLI, Gemini CLI, Cursor,
+Aider — and with humans. Agents that understand the `SKILL.md` skill format load it natively;
+agents that read project instructions pick it up via [`AGENTS.md`](./AGENTS.md); anything
+else (or anyone) can just open `SKILL.md`. See [Install](#install) for per-platform setup.
 
 It turns the excellent [*Fintech Engineering Handbook*](https://w.pitula.me/fintech-engineering-handbook/)
-by **Voytek Pitula** into a progressively-disclosed skill so an AI agent reads only the
-layer it needs for the task at hand.
+by **Voytek Pitula** into a progressively-disclosed skill so an agent reads only the layer it
+needs for the task at hand.
 
 > **Scope.** Money-movement engineering (payments, ledgers, settlement, reconciliation,
 > custody balances) is first-class. Capital-markets / trading systems (market-making, order
@@ -63,6 +69,7 @@ soft or absolute prose into testable, decision-oriented defaults. All are flagge
 ```
 fintech-engineering-handbook/
 ├── SKILL.md                 # entry point: scope, 3 principles, forced-output defaults + a "which file?" map
+├── AGENTS.md                # universal entry for non-SKILL.md agents (Codex, Cursor, Aider…) → routes to SKILL.md
 ├── references/
 │   ├── representing-money.md     # precision (default stance + decision matrix), rounding, currencies, FX rates
 │   ├── ledger.md                 # double-entry, balances-as-projections, timestamps, audit trails, event sourcing, immutability/GDPR
@@ -78,19 +85,37 @@ fintech-engineering-handbook/
 
 ## Install
 
-**Claude Code** — clone (or copy) the skill folder into your skills directory:
+The skill is plain Markdown with no dependencies. Clone it once, then point your agent at it.
 
 ```bash
-git clone https://github.com/<owner>/fintech-engineering-handbook.git \
+git clone https://github.com/YSKM523/fintech-engineering-handbook.git
+```
+
+**Claude Code** — put the folder in your skills directory:
+
+```bash
+git clone https://github.com/YSKM523/fintech-engineering-handbook.git \
   ~/.claude/skills/fintech-engineering-handbook
 ```
 
-It activates automatically when a conversation touches financial/money-handling systems.
-You can also trigger it explicitly with `/fintech-engineering-handbook` (or by asking about
-ledgers, idempotency for payments, reconciliation, etc.).
+It activates automatically when a conversation touches financial/money-handling systems, or
+trigger it explicitly with `/fintech-engineering-handbook`.
 
-For other platforms (Codex, Copilot CLI, Gemini CLI), drop the folder into that tool's
-skills location — the skill is plain Markdown with no dependencies.
+**Codex** — drop the folder in the Codex skills directory (`~/.codex/skills/`); Codex loads
+`SKILL.md` skills natively. Or reference it from your project's `AGENTS.md`.
+
+**GitHub Copilot CLI** — install it as a plugin / place it where Copilot discovers skills; it
+reads the same `SKILL.md` format.
+
+**Gemini CLI** — Gemini reads `SKILL.md` metadata and activates it on demand; you can also
+`ln -s AGENTS.md GEMINI.md` if you want it always in context for a project.
+
+**Cursor / Aider / Zed / any agent that reads project instructions** — keep the folder in (or
+referenced from) your repo; these tools read [`AGENTS.md`](./AGENTS.md), which routes them to
+`SKILL.md` + the relevant `references/` file.
+
+**Anything else (or a human)** — just open [`SKILL.md`](./SKILL.md) and follow its map. No
+tooling required.
 
 ## Attribution & license
 
