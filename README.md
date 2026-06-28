@@ -8,6 +8,13 @@ It turns the excellent [*Fintech Engineering Handbook*](https://w.pitula.me/fint
 by **Voytek Pitula** into a progressively-disclosed skill so an AI agent reads only the
 layer it needs for the task at hand.
 
+> **Scope.** Money-movement engineering (payments, ledgers, settlement, reconciliation,
+> custody balances) is first-class. Capital-markets / trading systems (market-making, order
+> books, options & derivatives, fixed income, FX/rates OTC, repo/swaps) are covered only at
+> an **orientation + architecture-risk** level — the skill supplies the vocabulary and flags
+> the structural risks, then defers the deep design to specialists. It is not a
+> capital-markets handbook.
+
 ## What it does
 
 When a task touches money, the skill helps Claude:

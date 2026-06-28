@@ -123,6 +123,43 @@ handbook covers a concept properly, the entry points to that reference.
 - **AUM / AUC** — assets under management (actively managed, fee-bearing mandate) vs assets
   under custody (merely safekept). The same holdings can be one, the other, or both.
 
+## Capital markets: orientation & architecture risk flags (defer the deep modeling)
+
+This handbook is money-movement-first. The terms above give you the vocabulary, but a
+trading / brokerage / market-making / derivatives / fixed-income / FX-OTC system is a
+different beast from a payments ledger, and modeling it well takes specialist depth (fixed
+income and FX OTC structure notoriously so). Treat capital markets as **orientation +
+risk-flagging only**: name the structural differences, then bring in specialists rather than
+designing the core yourself.
+
+Architecture risk flags — where a payments/ledger mental model breaks down:
+
+- **Positions and P&L, not just cash balances.** You hold a position, mark it to market
+  continuously, and carry unrealized P&L — valuation is a live, market-data-driven number,
+  not a settled balance. (Leans hard on as-of rates and provenance — see the truth hierarchy
+  and data lineage in `external-world.md`.)
+- **Real-time margin, leverage, liquidation.** Collateral, haircuts, maintenance margin, and
+  *forced* liquidation are real-time risk controls — stale or wrong prices liquidate real
+  positions. Not after-the-fact reconciliation.
+- **Latency and ordering are correctness.** Matching engines, price-time priority,
+  deterministic sequencing, fairness — "the order book is correct" is a harder invariant than
+  "the books balance."
+- **Listed vs OTC are structurally different.** Listed (order book, central clearing,
+  standardized, DvP) vs OTC (bilateral, negotiated, ISDA/CSA collateral, bespoke settlement
+  conventions). Fixed income and FX OTC are where the multi-year learning curve lives.
+- **Instruments have lifecycles.** Corporate actions, dividends/splits, coupons, rolls,
+  expiries, exercise/assignment — an instrument is not a static row.
+- **Settlement is multi-party and netted.** Clearing vs settlement, CCPs, novation, netting
+  sets — different from a PSP settling a batch to your bank.
+- **A heavier, different regulatory surface.** Best execution, suitability, market-abuse
+  surveillance, trade/transaction reporting (MiFID, Reg NMS, EMIR…) — a securities/derivatives
+  compliance boundary, not the payments one (see `controls-and-access.md` → the compliance
+  boundary).
+
+Reading: for listed-market microstructure (order books, makers/takers, spreads), *Trading
+and Exchanges* (Further resources, below). For OTC fixed income and FX there is no shortcut —
+pair with a desk/quant who lives in it.
+
 ## Custody & crypto
 
 - **Custody** — who controls the assets: self-custody (the user holds the keys) vs custodial

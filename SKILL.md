@@ -10,6 +10,10 @@ description: >-
   user never says "fintech" — any time money amounts, balances, multiple currencies, FX
   rates, payment integrations, or a transaction ledger are involved, these patterns apply.
   Also use it as a glossary when a finance/payments/trading/crypto term is unclear.
+  Scope: money-movement engineering (payments, ledgers, settlement, reconciliation, custody
+  balances) is first-class; capital-markets/trading systems (market-making, order books,
+  options/derivatives, fixed income, FX/rates OTC, repo/swaps) are covered only at an
+  orientation + architecture-risk level — defer the deep design to specialists there.
 ---
 
 # Fintech Engineering Handbook
@@ -22,6 +26,24 @@ unprovable audit trails).
 > Source & attribution: this skill adapts the *Fintech Engineering Handbook* by
 > **Voytek Pitula** — <https://w.pitula.me/fintech-engineering-handbook/>. See `NOTICE.md`.
 > It is a living document; the original welcomes contributions.
+
+## Scope & boundaries
+
+**First-class:** money-movement engineering — payments, ledgers/double-entry, wallets and
+custody *balances*, FX conversion, settlement, reconciliation. The money-handling patterns
+this skill is built around; use it freely here.
+
+**Orientation only — defer the deep modeling:** capital markets — trading and matching
+engines, market-making, order books, options and other derivatives, fixed income, FX/rates
+*OTC* structure, repo and swaps. This is **not** a capital-markets handbook. When a task
+lands here: supply the vocabulary (`references/glossary.md` → Trading & markets), raise the
+relevant **architecture risk flags** (positions and mark-to-market P&L instead of cash
+balances; real-time margin and liquidation; latency/ordering as correctness; instrument
+lifecycle/corporate actions; multi-party netted settlement; a heavier, different regulatory
+surface — full list in the glossary's *Capital markets* section), and then **defer the core
+design to capital-markets specialists** — fixed income and FX OTC structure in particular
+take years to model correctly. For listed-market microstructure, point to *Trading and
+Exchanges*. This is also a securities/derivatives **compliance-boundary** surface (below).
 
 ## The three principles (the whole point)
 

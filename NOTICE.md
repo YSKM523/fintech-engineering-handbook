@@ -18,8 +18,10 @@ per-context decision matrix in `references/representing-money.md`, the
 replayability** and **truth hierarchy** (per-source/per-role authority) sections in
 `references/external-world.md`, the **effectively-once review checklist** in
 `references/executing-money-flows.md`, the **compliance boundary** (engineerable vs
-not-engineering's-to-decide) in `references/controls-and-access.md`, and a sweep turning
-several soft or absolute judgment calls into conditional defaults. These are informed by community
+not-engineering's-to-decide) in `references/controls-and-access.md`, an explicit **scope
+boundary** (money-movement first-class; capital markets orientation-only) in `SKILL.md` and
+`references/glossary.md`, and a sweep turning several soft or absolute judgment calls into
+conditional defaults. These are informed by community
 discussion of the handbook. That added guidance is the maintainer's recommendation, not the
 original author's words; the underlying principles and the bulk of the text remain Voytek
 Pitula's.
