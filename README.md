@@ -34,22 +34,25 @@ which one is at risk.
 flowchart LR
     subgraph P1["① No invented data — money can't appear from nowhere"]
         direction TB
-        a1[idempotency + dedup]
-        a2[reconciliation]
-        a3[funds reservation]
+        a1[idempotency + dedup]:::inv
+        a2[reconciliation]:::inv
+        a3[funds reservation]:::inv
     end
     subgraph P2["② No lost data — everything is tracked and persisted"]
         direction TB
-        b1[full precision]
-        b2[event sourcing + audit trails]
-        b3[data lineage + replay]
+        b1[full precision]:::lost
+        b2[event sourcing + audit trails]:::lost
+        b3[data lineage + replay]:::lost
     end
     subgraph P3["③ No trust — verify the world; fail loudly"]
         direction TB
-        c1[truth hierarchy]
-        c2[verify webhooks, cross-source checks]
-        c3[immutability + tamper evidence]
+        c1[truth hierarchy]:::trust
+        c2[verify webhooks, cross-source checks]:::trust
+        c3[immutability + tamper evidence]:::trust
     end
+    classDef inv fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef lost fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef trust fill:#fee2e2,color:#7f1d1d,stroke:#dc2626;
 ```
 
 The skill's habit is to **lead with the principle at risk** ("clamping a negative balance to
@@ -68,16 +71,22 @@ the one(s) a task needs.
 flowchart TB
     subgraph PIPE["The money-handling pipeline"]
         direction TB
-        A["1 · Represent money<br/>precision, rounding, currency, FX"]
-        B["2 · Record it: the ledger<br/>double-entry, audit trail, immutability"]
-        C["3 · Execute money flows<br/>invariants, reservation, idempotency, resumability"]
-        D["4 · Talk to the external world<br/>APIs, truth hierarchy, webhooks, lineage, reconciliation"]
+        A["1 · Represent money<br/>precision, rounding, currency, FX"]:::l1
+        B["2 · Record it: the ledger<br/>double-entry, audit trail, immutability"]:::l2
+        C["3 · Execute money flows<br/>invariants, reservation, idempotency, resumability"]:::l3
+        D["4 · Talk to the external world<br/>APIs, truth hierarchy, webhooks, lineage, reconciliation"]:::l4
         A --> B --> C --> D
     end
-    E["Controls and access<br/>who may act · the compliance boundary"]
-    F["Testing<br/>prove the patterns actually hold"]
+    E["Controls and access<br/>who may act · the compliance boundary"]:::ctl
+    F["Testing<br/>prove the patterns actually hold"]:::tst
     E -. governs .-> PIPE
     F -. verifies .-> PIPE
+    classDef l1 fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef l2 fill:#e0e7ff,color:#3730a3,stroke:#4f46e5;
+    classDef l3 fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef l4 fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef ctl fill:#f3e8ff,color:#581c87,stroke:#9333ea;
+    classDef tst fill:#e2e8f0,color:#0f172a,stroke:#64748b;
 ```
 
 **Progressive disclosure.** `SKILL.md` (the always-loaded entry point) holds the three
@@ -127,11 +136,16 @@ together the truth hierarchy, idempotency, the clearing account, and reconciliat
 
 ```mermaid
 sequenceDiagram
+    autonumber
     actor U as User
-    participant API as Your API
-    participant PSP as Card PSP
-    participant L as Ledger
-    participant R as Reconciliation
+    box rgb(219,234,254) Your platform
+        participant API as Your API
+        participant L as Ledger
+        participant R as Reconciliation
+    end
+    box rgb(254,226,226) External
+        participant PSP as Card PSP
+    end
     U->>API: initiate deposit (idempotency key)
     API->>PSP: authorize — places a hold (not captured)
     PSP-->>API: webhook "captured"  [a TRIGGER]
@@ -160,6 +174,9 @@ driver can resume — and every step is safe to re-run:
 
 ```mermaid
 stateDiagram-v2
+    classDef done fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef stop fill:#fee2e2,color:#7f1d1d,stroke:#dc2626;
+    classDef live fill:#fef3c7,color:#78350f,stroke:#d97706;
     [*] --> Requested: submit (idempotency key)
     Requested --> Reserved: reserve funds (available = total - reserved)
     Reserved --> Screening: AML / sanctions
@@ -169,6 +186,9 @@ stateDiagram-v2
     Confirming --> Settled: enough confirmations (reorg-safe)
     Released --> [*]
     Settled --> [*]
+    class Settled done
+    class Released stop
+    class Broadcasting live
     note right of Broadcasting
         resume re-checks the chain;
         never re-broadcasts

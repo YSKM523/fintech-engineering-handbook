@@ -50,6 +50,21 @@ Exchanges*. This is also a securities/derivatives **compliance-boundary** surfac
 Every pattern in this handbook is a way to uphold three principles. When you are unsure
 what to do in a money system, return to these and ask which one is at risk.
 
+```mermaid
+flowchart LR
+    M(("Money<br/>software")):::core
+    M --> P1["① No invented data"]:::inv
+    M --> P2["② No lost data"]:::lost
+    M --> P3["③ No trust"]:::trust
+    P1 --> a["idempotency · dedup<br/>reconciliation · reservation"]:::inv
+    P2 --> b["full precision · audit trails<br/>event sourcing · data lineage"]:::lost
+    P3 --> c["truth hierarchy · verify webhooks<br/>cross-source · fail loudly"]:::trust
+    classDef core fill:#111827,color:#ffffff,stroke:#111827;
+    classDef inv fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef lost fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef trust fill:#fee2e2,color:#7f1d1d,stroke:#dc2626;
+```
+
 1. **No invented data.** Money can't appear from nowhere — no duplicates, no arbitrary
    balance updates. Enforced with idempotency, deduplication, and reconciliation.
 2. **No lost data.** Everything that happens to money must be tracked and persisted.
