@@ -100,6 +100,78 @@ possibly-lost, possibly-duplicated hint; verify the source and confirm actual st
 the API. *No lost data:* persist the raw event and back delivery with reconciliation so a
 dropped webhook isn't a dropped fact.
 
+## Data lineage and replayability
+
+Persisting every request/response (Consuming APIs) and every raw webhook (Handling
+webhooks) is necessary but **not sufficient**. Keeping the bytes doesn't, on its own, answer
+the questions an audit or an incident actually asks:
+
+- A vendor revised a value *intraday* — an FX/reference rate, a price, a KYC/sanctions
+  status, a custodian balance. **Which of your computations used the old value?**
+- **Re-run last Tuesday's** statement, risk decision, or settlement and get *the same*
+  result — against the inputs as they were *then*, not as they are now.
+
+Answering these needs external data modeled as **versioned, timestamped facts with
+provenance**, and every derived output tied back to the exact input versions it consumed.
+Two capabilities: **lineage** (for any output, the input facts and versions that produced
+it) and **replay** (re-execute a past computation against those exact versions and reproduce
+the result).
+
+### The data-lineage checklist (capture for every external fact)
+
+For each external fact you ingest — a reference rate, a price, a custodian balance, a
+KYC/AML/sanctions result, a provider's view of a transaction — record:
+
+- **`source`** — who said it (provider, endpoint, node, file). Not "the FX rate" but *which*
+  rate from *which* venue.
+- **`source_timestamp`** — the time the source attributes to the fact (the rate's as-of
+  time, the event's value time).
+- **`observed_at`** — when you first fetched/observed it.
+- **`ingested_at`** — when it landed in your store of record. These three diverge; collapsing
+  them loses the ability to explain ordering (cf. value vs booking vs settlement time).
+- **`version` / `hash`** — a content hash or version id, so an intraday update is a *new
+  version* of the same logical fact, not an overwrite. The hash also makes accidental
+  mutation or tampering detectable.
+- **`raw_payload`** — the verbatim bytes. You already persist these; here they become an
+  addressable, versioned artifact, not just a log line.
+- **`transformation`** — the steps that turned the raw payload into the normalized value you
+  compute with (parse, unit/precision conversion, enrichment), enough to reproduce them.
+- **`used_by`** — the id(s) of the computations/decisions that consumed *this version*. This
+  is the link that answers "what did the stale value touch?".
+
+### Treat external facts as append-only and versioned
+
+A vendor that revises a value intraday must produce a **new version**, never an in-place
+overwrite — the same discipline as the immutable ledger (see Audits and audit trails →
+Immutability). "Current value" is then a projection: *the latest version as of time T*.
+Storing only "current" is precisely what destroys lineage.
+
+### Replay as a first-class requirement
+
+Any report, pricing, risk/compliance decision, or settlement result must be reproducible
+from the input versions seen at decision time:
+
+1. **A computation records the version/hash of every fact it read** (the `used_by` link, in
+   reverse) — not just the values.
+2. **Replay re-runs the same logic against those pinned versions** and must reproduce the
+   original result. If it doesn't, either a version wasn't captured or the logic isn't
+   deterministic — both are bugs. This is the audit's "explain how you got this number,"
+   made executable; it pairs with golden and backward-compatibility testing (see Testing).
+3. **Pin the logic/code version too.** The decision logic that ran then may differ from
+   today's, so a fact-only replay isn't fully reproducible (cf. recording decisions as
+   replayable artifacts in Audits and audit trails).
+
+**The intraday-update trap, concretely:** you value holdings at 10:00 using rate `v1`; the
+vendor revises it at 14:00 (`v2`); a 15:00 report uses `v2`. An auditor asks why the two
+disagree. Without lineage you can only show "the rate" (whatever's current now); with it you
+show `v1` vs `v2`, their timestamps, and exactly which outputs each fed — and you can
+*reproduce* the 10:00 number, because the input it used still exists as a pinned version.
+
+**Principles touched** — *No lost data:* keeping only the current value of an external fact
+silently discards the versions your past computations depended on; lineage preserves them.
+*No trust:* "explain and reproduce this result" verifies an outcome against the inputs that
+actually produced it, instead of trusting whatever the system shows now.
+
 ## Notifying reliably (outbox and CDC)
 
 Often you must reliably tell the external world about changes — publish a Kafka event,
