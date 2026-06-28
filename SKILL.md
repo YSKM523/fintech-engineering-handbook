@@ -54,7 +54,7 @@ the task actually needs.
 | Recording movements so the books balance and survive audit: double-entry, value/booking/settlement time, audit trails, event sourcing, immutability, reversals, GDPR | `references/ledger.md` |
 | Keeping a single operation correct end-to-end: invariants, funds reservation/holds, overdrafts, idempotency, crash-resumable multi-step flows, the effectively-once review checklist | `references/executing-money-flows.md` |
 | Talking to unreliable third parties: the truth hierarchy (which source is authoritative for what), consuming APIs, webhooks, reliable notification (outbox/CDC), reconciliation, data lineage & replayability | `references/external-world.md` |
-| Who may act and proving the process was followed: segregation of duties / four-eyes, access control, the SDLC change trail | `references/controls-and-access.md` |
+| Who may act and proving the process was followed: the compliance boundary (what engineering must not decide alone), segregation of duties / four-eyes, access control, the SDLC change trail | `references/controls-and-access.md` |
 | How to gain confidence: property-based testing, invariant/idempotency injection, crash-resume tests, round-trip, golden, backward-compat, testing in production | `references/testing.md` |
 | A finance/payments/trading/crypto/compliance **term** you need defined | `references/glossary.md` |
 | Seeing the patterns combined in a realistic flow (crypto withdrawal, card deposit, in-app conversion) | `references/end-to-end-examples.md` |
@@ -119,6 +119,32 @@ has a hole:
 
 Defaults, rationale, and the test that proves each (questions 1-5 → idempotency testing,
 6-8 → crash/resume injection) are in `references/executing-money-flows.md`.
+
+## Know the compliance boundary
+
+This skill is engineering patterns, **not legal or regulatory advice**. In a regulated
+financial institution, engineering must align with your lawyers, compliance, finance, and
+internal handbooks — they own *what the rule is and who is liable*; engineering owns making
+that rule correct, provable, and robust.
+
+So whenever a task touches **fund custody, user assets, KYC/AML, sanctions screening,
+financial/regulatory reporting, tax, GDPR/privacy, cross-border payments, securities or
+derivatives, or crypto custody**, don't silently bake in a guess. Instead:
+
+- **Split your recommendation into two columns** — *engineerable* (the how: data model,
+  precision, idempotency, audit completeness, immutability/erasure mechanism, RBAC and
+  four-eyes enforcement, reconciliation, replayability) vs *not engineering's to decide
+  alone* (the what/who/whether: retention periods, screening lists and thresholds, KYC
+  evidence and tiers, PII-vs-financial-record classification, tax treatment, licensing and
+  travel-rule thresholds, whether an instrument is a regulated security, the custody model,
+  whether a prod test moving real money is allowed).
+- **Name the owner and the open decision** for each second-column item (compliance / legal /
+  finance / risk) rather than hardcoding a number as if it were fact.
+- **Default conservative and policy-configurable** until confirmed — a placeholder behind
+  config with a visible TODO + owner; lean toward keeping data and *not* acting.
+
+Build the engineerable half fully; flag the rest. Two-column table and mechanics in
+`references/controls-and-access.md`.
 
 ## How to apply it well
 

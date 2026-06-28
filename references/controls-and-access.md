@@ -6,6 +6,61 @@ principle turns inward: your own operators and engineers are a trust boundary to
 external providers and internal components. An auditor examines these controls alongside the
 books themselves.
 
+## The compliance boundary (what engineering must not decide alone)
+
+The patterns in this handbook are **engineering** patterns. In a regulated financial
+institution they sit inside a second system of rules — laws, regulator guidance, your
+compliance policies, internal handbooks — and **engineering does not own those rules**. The
+healthy division of labour: compliance / legal / finance / risk decide *what the rule is and
+who is liable*; engineering decides *how to implement it correctly, provably, and robustly*.
+Most of this handbook is the second half of a requirement whose first half a regulator wrote.
+
+This is not a disclaimer to wave and move on — that would be the useless version. It's an
+operational habit: when a task touches a regulated surface, **partition the work and flag the
+decisions that aren't yours**, instead of silently hardcoding a guess that *looks*
+authoritative.
+
+**When to flag.** Treat these as trigger surfaces — if the task touches one, the compliance
+boundary is in play: fund custody, user assets, KYC, AML/CFT, sanctions screening, financial
+or regulatory reporting, tax, GDPR/privacy and data retention, cross-border payments,
+securities or derivatives, and crypto custody.
+
+**Split the recommendation into two columns:**
+
+| Engineerable (the *how* — decide and build) | Not engineering's to decide alone (the *what / who / whether*) |
+|---|---|
+| Data model, precision, the rounding *mechanism* | The rounding/tax *rule* and who gets the fraction (tax/legal) |
+| Idempotency, reconciliation, audit-trail completeness | *Which* transactions/parties must be screened or reported, and the thresholds (compliance) |
+| Immutability + the crypto-shredding *mechanism* for erasure | Whether a given erasure request may be refused; what counts as PII vs a financial record (legal) |
+| Retention *enforcement* (TTL jobs, legal hold) | The retention *period* per record class (legal/regulator) |
+| RBAC, four-eyes, break-glass *enforcement* | Who is *allowed* to approve what; segregation requirements (compliance) |
+| Sanctions-screening *integration* and match plumbing | The list sources, the match threshold, and the action on a hit — block / freeze / file a report (compliance) |
+| Replayable decision records (rules engine, audit) | The KYC evidence required, risk tiers, re-verification cadence (compliance) |
+| The custody data model and segregation *mechanism* | Whether the custody / omnibus / FBO model is *legally permitted* here (legal) |
+| Synthetic prod transactions wired through the ledger | Whether testing in production with real money is *permitted*, and how it must be disclosed (compliance) |
+| Cross-border payment *plumbing* and travel-rule field capture | Licensing, permitted corridors, the travel-rule *threshold* (legal/compliance) |
+
+**How to handle the second column:**
+
+1. **Name the owner and the open question** — "retention period: compliance to confirm per
+   record class," not a silent `RETENTION_DAYS = 2555`.
+2. **Default conservative and make it policy-configurable** — a placeholder threshold/period
+   behind config with a visible TODO + owner, never a confident guess presented as fact. The
+   safe default leans toward *keeping* data and *not* acting (don't auto-delete, don't
+   auto-release funds) until confirmed.
+3. **Make the rule a replayable artifact, not buried code.** When compliance does set a
+   threshold or rule, encode it where it can be reviewed, versioned, and replayed (a decision
+   table / rules engine — see Audits and audit trails), so the control is auditable and the
+   business can change it without an engineer.
+4. **Still build the engineerable half fully.** Flagging the boundary is not an excuse to
+   stop — the value you add is a correct, provable, robust implementation that is *ready* for
+   the rule the moment compliance sets it.
+
+**Principles touched** — *No trust:* the compliance boundary is **No trust** pointed at your
+own authority — engineering verifying it isn't overstepping a decision that belongs to legal,
+compliance, or finance. *No lost data:* defaulting conservative (keep, don't act) until a rule
+is confirmed protects records you may be legally obliged to retain.
+
 ## Segregation of duties and four-eyes
 
 Some actions are too sensitive to leave to a single person, however trusted. Splitting them
