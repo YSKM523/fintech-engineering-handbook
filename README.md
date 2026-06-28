@@ -27,19 +27,50 @@ When a task touches money, the skill helps Claude:
 - See the patterns combined in three worked flows (crypto withdrawal, card deposit, in-app
   conversion).
 
+## What this skill adds beyond the original
+
+Most of the text is the original handbook, reorganized. A handful of sections are the
+maintainer's own extensions — informed by community discussion of the handbook — that turn
+soft or absolute prose into testable, decision-oriented defaults. All are flagged in
+[`NOTICE.md`](./NOTICE.md):
+
+1. **Money representation — a per-context default stance + decision matrix** (ledger /
+   storage / API transport / compute / display): amounts on the wire as strings with an
+   explicit scale and a rounding-policy reference; never a bare number or implied decimals;
+   arbitrary-width integers for crypto.
+2. **Ledger balances are projections, not "never stored"** — a stored balance is fine if it's
+   recomputable, reconcilable, explainable, and drift-detectable; what's forbidden is the
+   *uncomputable* balance mutated with no entry behind it.
+3. **A judgment-point sweep** — several soft or absolute calls turned into conditional
+   defaults: idempotency dedup window, circuit breakers, provider redundancy, reservation
+   backstop, key-reuse fingerprint, per-balance linearizability, testing defaults vs menu.
+4. **Data lineage & replayability** — an 8-field provenance checklist for every external
+   fact, append-only versioned facts, and replay of any report/decision against the exact
+   input versions it used.
+5. **The truth hierarchy** — per-source, per-role authority (trigger / booking basis / final
+   reconciliation authority) with a per-domain table; "don't trust the webhook" becomes a
+   role assignment, not a law.
+6. **The effectively-once review checklist** — eight testable questions tying idempotency and
+   resumability together, each mapped to a test (the goal is effectively-once *processing*,
+   not exactly-once *delivery*).
+7. **The compliance boundary** — split every recommendation into *engineerable* vs *not
+   engineering's to decide alone*, with trigger surfaces and how to handle the second column.
+8. **An explicit scope boundary** — money-movement engineering is first-class; capital
+   markets is orientation + architecture-risk-flagging only (see the Scope note above).
+
 ## Structure
 
 ```
 fintech-engineering-handbook/
-├── SKILL.md                 # entry point: 3 principles + a "which file do I read?" map
+├── SKILL.md                 # entry point: scope, 3 principles, forced-output defaults + a "which file?" map
 ├── references/
-│   ├── representing-money.md     # precision, rounding, currencies, FX rates
-│   ├── ledger.md                 # double-entry, timestamps, audit trails, event sourcing, immutability
-│   ├── executing-money-flows.md  # invariants, funds reservation, overdrafts, idempotency, resumability
-│   ├── external-world.md         # consuming APIs, webhooks, outbox/CDC, reconciliation
-│   ├── controls-and-access.md    # segregation of duties, access control, SDLC change trail
+│   ├── representing-money.md     # precision (default stance + decision matrix), rounding, currencies, FX rates
+│   ├── ledger.md                 # double-entry, balances-as-projections, timestamps, audit trails, event sourcing, immutability/GDPR
+│   ├── executing-money-flows.md  # invariants, funds reservation, overdrafts, idempotency, resumability, effectively-once checklist
+│   ├── external-world.md         # consuming APIs, truth hierarchy, webhooks, data lineage & replay, outbox/CDC, reconciliation
+│   ├── controls-and-access.md    # compliance boundary, segregation of duties, access control, SDLC change trail
 │   ├── testing.md                # property-based, invariant/idempotency injection, golden, prod testing
-│   ├── glossary.md               # Appendix A: domain vocabulary + further reading
+│   ├── glossary.md               # Appendix A: domain vocabulary (+ capital-markets orientation) + further reading
 │   └── end-to-end-examples.md    # Appendix B: three worked flows
 ├── NOTICE.md                # attribution to the original handbook
 └── README.md
