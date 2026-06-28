@@ -56,6 +56,61 @@ your control, so verify facts against independent sources and validate at the bo
 *No lost data:* persisting every request/response keeps a record to reconcile against and
 reprocess from.
 
+## The truth hierarchy (which source is authoritative for what)
+
+"Don't trust the webhook" is a useful reflex, not a law. In some domains a signed webhook
+is the *only* authoritative signal you get; in others it's a throwaway hint and the real
+state lives in a settlement file that lands days later. So don't mechanically declare any
+one channel "the source of truth." The right question isn't *is X the truth?* but **which
+source is authoritative for which role, in this domain?**
+
+Every external fact plays one of three roles, and the *same* physical channel (a webhook, an
+API, a file) plays different roles in different integrations:
+
+1. **Trigger** — the cheap, fast, lossy, untrusted signal that something *may* have happened
+   and you should look. Often a webhook; sometimes a poll/cron. **You never book on a trigger
+   alone.**
+2. **Booking basis** — the state you actually post to the ledger from, at booking time. It
+   must be the most authoritative source *available at that moment* — usually an authoritative
+   API read. **But when the domain offers nothing better, the trigger itself is the booking
+   basis** (a provider with no read API → the signature-verified webhook is what you book on).
+3. **Final reconciliation authority** — the slower, definitive source that wins disputes and
+   that you reconcile against later: a settlement file, a bank statement, on-chain finality, a
+   custodian statement. When it disagrees with what you booked, **it wins** — you post a
+   correction toward it.
+
+**Before integrating any source, identify the domain and write down its hierarchy** —
+which channel is the trigger, which is the booking basis, which is the final authority.
+Skipping this is how you either over-trust a webhook or pointlessly re-query an API that
+isn't actually more authoritative than the webhook was.
+
+Typical hierarchies (confirm per integration — they vary by provider):
+
+| Domain | Trigger | Booking basis | Final reconciliation authority |
+|---|---|---|---|
+| **Card PSP** | capture/refund webhook | PSP API read of the payment | PSP **settlement file/report** → bank statement |
+| **ACH / bank transfer** | webhook or status poll | bank/processor API status | **bank statement** + returns/NOC files |
+| **Blockchain deposit/withdrawal** | node/indexer notification, mempool | the node's confirmed view | **chain finality** (enough confirmations, reorg-aware) |
+| **Custodian** | webhook/notification | custodian API | custodian **statement/attestation** |
+| **Market-data / FX vendor** | tick stream / webhook | vendor's quoted value at the as-of time | vendor's **official/closing/reference file** (+ a 2nd vendor to cross-check) |
+| **KYC / AML vendor** | result webhook | vendor API decision + your recorded decision | vendor's **case/audit record** + your replayable decision |
+| **Your own ledger** | — | it *is* your internal booking basis | the **internal ledger** is authoritative for *your* obligations; external authorities govern *external* movements |
+
+Two consequences worth stating explicitly:
+
+- **A webhook can legitimately be the booking basis** — when no more authoritative read
+  exists, a signature-verified webhook (over raw bytes) is exactly what you book on. This is
+  the case the "always re-query the API" reflex gets wrong. It is almost never the *final*
+  authority, though.
+- **The booking basis and the final authority are usually different sources.** The gap between
+  them is precisely what reconciliation closes (and why booking time ≠ settlement time — see
+  Value time vs booking time vs settlement time, and Reconciliation).
+
+**Principles touched** — *No trust:* authority is assigned per source *and per role*, then
+verified by reconciliation against the final source — never granted wholesale to whoever
+spoke last. *No invented data:* you book on the most authoritative source available and
+correct toward the final one, so a premature or wrong signal can't mint a fact.
+
 ## Handling webhooks
 
 Webhooks (HTTP endpoints you expose, called by an external system with a payload it
@@ -65,16 +120,17 @@ trivial. Many of these points apply to other transports too.
 1. **Don't assume ordering.** Messages can arrive out of order or carry stale data — the
    last webhook isn't necessarily the latest truth. Don't blindly overwrite state; reconcile
    against what you already know (e.g. query the API for current state).
-2. **Don't assume validity — default to "trigger, then confirm."** A webhook may come from
-   a secondary part of the issuer's system and carry stale or improperly transformed data,
-   so the default is to **treat the payload as a trigger and query the API for the
-   authoritative state** rather than acting on the webhook's contents. Beware the API can be
-   eventually consistent and lag the webhook — a query right after the trigger may still
-   return the old state, so be ready to retry. You may trust the payload's content only when
-   *all* of these hold: the signature is verified over the raw bytes (point 7); the field is
-   monotonic or otherwise safe to apply twice; and there is no authoritative read endpoint
-   to confirm against (some providers send data their API never exposes). Either way,
-   persist the raw event and keep processing idempotent.
+2. **Don't assume validity — default to "trigger, then confirm."** In the truth hierarchy
+   (above) a webhook is the **trigger**, not the booking basis: it may come from a secondary
+   part of the issuer's system and carry stale or improperly transformed data, so the default
+   is to **treat the payload as a trigger and query the booking-basis source (usually the API)
+   for the authoritative state** rather than acting on the webhook's contents. Beware that
+   source can be eventually consistent and lag the webhook — a query right after the trigger
+   may still return the old state, so be ready to retry. The webhook is **promoted to the
+   booking basis only** when *all* of these hold: the signature is verified over the raw bytes
+   (point 7); the field is monotonic or otherwise safe to apply twice; and there is no more
+   authoritative read endpoint to confirm against (some providers send data their API never
+   exposes). Either way, persist the raw event and keep processing idempotent.
 3. **Don't assume delivery.** Webhooks get lost sooner or later, regardless of the issuer's
    re-delivery promises. Handle a missing webhook with an independent process that fixes
    the completeness of your data — see Reconciliation.

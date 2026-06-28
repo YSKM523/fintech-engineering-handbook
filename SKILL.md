@@ -53,7 +53,7 @@ the task actually needs.
 | How to model/store/serialize an amount; precision, rounding, currencies, FX rate direction & timing | `references/representing-money.md` |
 | Recording movements so the books balance and survive audit: double-entry, value/booking/settlement time, audit trails, event sourcing, immutability, reversals, GDPR | `references/ledger.md` |
 | Keeping a single operation correct end-to-end: invariants, funds reservation/holds, overdrafts, idempotency, crash-resumable multi-step flows | `references/executing-money-flows.md` |
-| Talking to unreliable third parties: consuming APIs, webhooks, reliable notification (outbox/CDC), reconciliation, data lineage & replayability | `references/external-world.md` |
+| Talking to unreliable third parties: the truth hierarchy (which source is authoritative for what), consuming APIs, webhooks, reliable notification (outbox/CDC), reconciliation, data lineage & replayability | `references/external-world.md` |
 | Who may act and proving the process was followed: segregation of duties / four-eyes, access control, the SDLC change trail | `references/controls-and-access.md` |
 | How to gain confidence: property-based testing, invariant/idempotency injection, crash-resume tests, round-trip, golden, backward-compat, testing in production | `references/testing.md` |
 | A finance/payments/trading/crypto/compliance **term** you need defined | `references/glossary.md` |
@@ -82,6 +82,24 @@ the most common *silent* failure, so don't wait to be asked. The default stance:
 Crucially, this is **per-context**: minor-units integer is the right *storage/ledger* form
 but a poor *interchange* form unless the scale travels with it. The full decision matrix
 (ledger / storage / transport / compute / display) is in `references/representing-money.md`.
+
+## Before any external integration: state the truth hierarchy
+
+"Don't trust the webhook" is a reflex, not a law — in some domains a signed webhook is the
+only authoritative signal there is. So don't mechanically declare any one channel the source
+of truth. Instead, identify the domain (card PSP, ACH, blockchain, custodian,
+market-data/KYC vendor, internal ledger) and **emit its source-of-truth hierarchy** across
+three roles:
+
+- **Trigger** — wakes you up (often a webhook/poll); never book on it alone.
+- **Booking basis** — the most authoritative source available *at booking time* that you
+  post the ledger from (usually an API read; the webhook itself only when nothing better
+  exists).
+- **Final reconciliation authority** — what wins disputes and you reconcile against later
+  (settlement file, bank statement, chain finality, custodian statement).
+
+Booking basis and final authority are usually *different* sources; the gap between them is
+what reconciliation closes. Per-domain table in `references/external-world.md`.
 
 ## How to apply it well
 

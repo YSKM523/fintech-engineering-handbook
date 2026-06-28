@@ -15,8 +15,9 @@ A few places additionally add the maintainer's own decision-oriented guidance th
 *extends* the original — most notably the money-representation **default stance** and
 per-context decision matrix in `references/representing-money.md`, the
 *stored-balances-are-projections* framing in `references/ledger.md`, the **data lineage &
-replayability** section in `references/external-world.md`, and a sweep turning several soft
-or absolute judgment calls into conditional defaults. These are informed by community
+replayability** and **truth hierarchy** (per-source/per-role authority) sections in
+`references/external-world.md`, and a sweep turning several soft or absolute judgment calls
+into conditional defaults. These are informed by community
 discussion of the handbook. That added guidance is the maintainer's recommendation, not the
 original author's words; the underlying principles and the bulk of the text remain Voytek
 Pitula's.
